@@ -7,6 +7,8 @@ The library will encompass:
 * A matrix data type
 * Gauss-Jordan elimination
 * Eigenvalues and eigenvector derivation
+* Vector space data type
+* Vector space span testing
 * Matrix projection
 * Matrix diagonalization
 * Pagerank algorithm
