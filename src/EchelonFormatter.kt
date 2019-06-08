@@ -1,10 +1,9 @@
-import EchelonFormatter.Outcome.ECHELON
-import EchelonFormatter.Outcome.PARAMETRIC_SOLUTION_REQUIRED
+import EchelonFormatter.Outcome.*
 import java.io.Serializable
 
 object EchelonFormatter {
 
-    private open class Move: Serializable
+    private open class Move : Serializable
 
     private class Scale(val scalar: Float, val row: Int) : Move()
 
@@ -39,26 +38,42 @@ object EchelonFormatter {
         return moves
     }
 
-    private enum class Outcome {
+    class MatrixOutcome(val matrix: Matrixf, val outcome: Outcome)
+
+    enum class Outcome {
         ECHELON,
-        PARAMETRIC_SOLUTION_REQUIRED
+        PARAMETRIC_SOLUTION_REQUIRED,
+        NOT_DONE
     }
 
-    private fun isFinished(matrix: Matrixf): Outcome {
+    private fun isTriangularized(matrix: Matrixf): Boolean =
+        (0 until matrix.values[0].size)
+            .all { i -> (i until matrix.values.size).all { j -> matrix[i, j] == 0f } }
+
+    private fun isEchelonForm(matrix: Matrixf): Boolean =
+        isTriangularized(matrix) && (0 until matrix.values.size).all { i -> matrix[i, i] == 1f }
+
+
+    private fun isReducedEchelonForm(matrix: Matrixf): Outcome =
         when {
+            matrix.values.map { r -> r.all { v -> v == 0f } }.filter { it }.count() > 1 -> PARAMETRIC_SOLUTION_REQUIRED
+            isEchelonForm(matrix) && (0 until matrix.values[0].size)
+                .all { i -> (0 until i).all { j -> matrix[i, j] == 0f } } -> ECHELON
+            else -> NOT_DONE
         }
-        return ECHELON
-    }
 
     private fun utlity(matrix: Matrixf, move: Move): Float {
         return Float.NEGATIVE_INFINITY
     }
 
-
     /*
      * SO, the idea here is to use a search algorithm to find the a row-reduced version of the matrix.
-     * I want it to follow the way i usually think about gaussian elmination/reduction, but it should also be workable.
+     * I want it to follow the way i usually think about gaussian elimination/reduction, but it should also be workable.
      * I used our expectiminimax for inspiration:
      * <a href="https://github.itu.dk/WingIT/othello-ai1/blob/master/src/OthelloAI1.java"/>
      */
+
+    fun triangularizeMatrix(matrix: Matrixf): MatrixOutcome {
+        return MatrixOutcome(matrix, NOT_DONE)
+    }
 }
