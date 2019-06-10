@@ -1,9 +1,9 @@
-import GaussJordan.ReductionResultType.PARAMETRIC
 import GaussJordan.ReductionResultType.REDUCED_ROW_ECHELON
-import java.lang.Exception
 import java.lang.StringBuilder
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.stream.Collectors
+import java.util.stream.IntStream
 import kotlin.streams.toList
 
 /**
@@ -99,7 +99,19 @@ class Matrixf(val rows: Array<FloatArray>) {
 
     operator fun unaryMinus() = map { v -> -1 * v }
 
-    infix operator fun times(other: Matrixf) = mapIndexed { _, j, v -> (other.column(j).map { u -> v * u }.sum()) }
+    infix operator fun times(other: Matrixf): Matrixf {
+        val out = identity(this.n, other.m)
+        parallelIndexed().forEach { (i, r) ->
+            for (j in 0 until other.m) {
+                out[i, j] = 0f
+                r.forEach { (k, v) ->
+                   out[i, j] += v * other[k, j]
+                }
+            }
+        }
+        return out
+    }
+
     infix operator fun times(vector: Vectorf) = this * fromColumns(vector.values)
 
     fun clone(): Matrixf =
@@ -145,7 +157,7 @@ class Matrixf(val rows: Array<FloatArray>) {
             r.forEach { (j, v) ->
                 when {
                     !result.get() -> return@forEach
-                    i == j && v!= 1f -> result.compareAndExchange(true, false)
+                    i == j && v != 1f -> result.compareAndExchange(true, false)
                     i > j && v != 0f -> result.compareAndExchange(true, false)
                 }
             }

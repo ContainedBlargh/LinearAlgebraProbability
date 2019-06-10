@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import java.util.concurrent.ThreadLocalRandom
 import java.util.stream.IntStream
 import kotlin.system.measureNanoTime
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -29,6 +30,11 @@ internal class MatrixfTest {
     @Test
     fun fromRowsTest() {
         println(Matrixf.fromRows(floatArrayOf(1f, 2f, 3f), floatArrayOf(2f, 3f, 1f), floatArrayOf(3f, 2f, 1f)))
+    }
+
+    @Test
+    fun identityTimesIdentity() {
+        assertEquals(identity, identity * identity)
     }
 
     @Test
@@ -81,9 +87,10 @@ internal class MatrixfTest {
                 move
             )
         }}")
-        val invertedManually = matrix.reducedEchelonForm().trace.fold(Pair(matrix, Matrixf.identity(matrix.n, matrix.m))) {
-            acc, move -> Pair(GaussJordan.applyMove(acc.first, move), GaussJordan.applyMove(acc.second, move))
-        }
+        val invertedManually =
+            matrix.reducedEchelonForm().trace.fold(Pair(matrix, Matrixf.identity(matrix.n, matrix.m))) { acc, move ->
+                Pair(GaussJordan.applyMove(acc.first, move), GaussJordan.applyMove(acc.second, move))
+            }
         println("Inverted manually:")
         println(invertedManually)
         println("Inverse:")
@@ -95,16 +102,63 @@ internal class MatrixfTest {
         println(Matrixf.identity(matrix.n, matrix.m) * inverse!!)
     }
 
+    @Test
+    fun inverseTest() {
+        val matrix = Matrixf.from(
+            2, 2,
+            -1f, 2f,
+            -1f, 1f
+        )
+        println("Matrix:\n$matrix")
+        val reduced = matrix.reducedEchelonForm()
+        println("Reduced:\n${reduced.matrix}\nWith Steps:\n${reduced.trace}")
+        val inverse = matrix.inverse()!!
+        println("Inverse:\n$inverse")
+        val matrixMulInverse = matrix * inverse
+        println("Original times inverse:\n$matrixMulInverse")
+        assertEquals(Matrixf.identity(2, 2), matrixMulInverse)
+    }
+
     fun randomMatrixf(n: Int, m: Int): Matrixf {
         val random = ThreadLocalRandom.current()
         fun next() = random.nextGaussian().toFloat()
         return Matrixf.init(n, m) { i, j -> next() }
     }
 
+    fun randomReducibleMatrix(n: Int, m: Int): Matrixf {
+        val random = ThreadLocalRandom.current()
+        fun next() = random.nextGaussian().toFloat()
+        var current = Matrixf.init(n, m) { i, j -> next() }
+        while (kotlin.runCatching { current.reducedEchelonForm() }.isFailure) {}
+        return current.clone()
+    }
+
+    @Test
+    fun reductionPerfTest() {
+        val mio = 1_000_00f
+        val n = 10
+        val reductionTimes: MutableList<Long> = mutableListOf()
+        val matrices = Array(n) { randomReducibleMatrix(n, n) }
+        IntStream.range(0, n).parallel().forEach {
+            reductionTimes.add(measureNanoTime {
+                matrices[it].reducedEchelonForm()
+            })
+        }
+        reductionTimes.sort()
+        val message =
+            "Size: ${n * n}\n" +
+                    "Reduction Times:" +
+                    "\nMax: ${reductionTimes.max()!! / mio}ms" +
+                    "\nMin: ${reductionTimes.min()!! / mio}ms" +
+                    "\nMedian: ${reductionTimes[reductionTimes.size / 2] / mio}ms" +
+                    "\nAvg.: ${reductionTimes.average() / mio}ms"
+        println(message)
+    }
+
     @Test
     fun complexMultiplication() {
         val mio = 1_000_000f
-        val n = 1000
+        val n = 200
         val buildTimes: MutableList<Long> = mutableListOf()
         val mulTimes: MutableList<Long> = mutableListOf()
         IntStream.range(0, 100).parallel().forEach {
