@@ -1,20 +1,24 @@
+import GaussJordan.ReductionResultType.PARAMETRIC
+import GaussJordan.ReductionResultType.REDUCED_ROW_ECHELON
+import java.lang.Exception
 import java.lang.StringBuilder
 import java.util.*
-import java.util.stream.Collectors
-import java.util.stream.IntStream
-import java.util.stream.Stream
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.streams.toList
 
 /**
  * Good times.
  */
-class Matrixf(val values: Array<FloatArray>) {
-    val m = values.size
-    val n = values.first().size
+class Matrixf(val rows: Array<FloatArray>) {
+    val m = rows.size
+    val n = rows.first().size
 
-    private fun parallel() = Arrays.stream(values).parallel()
-    private fun parallelIndexed() = Arrays.stream(values.mapIndexed { i, r ->
-        r.mapIndexed { j, v -> Triple(i, j, v) }.toTypedArray()
+    private var echelonForm: GaussJordan.ReductionResult? = null
+    private var reducedEchelonForm: GaussJordan.ReductionResult? = null
+
+    fun parallel() = Arrays.stream(rows).parallel()
+    fun parallelIndexed() = Arrays.stream(rows.mapIndexed { i, r ->
+        Pair(i, r.mapIndexed { j, v -> Pair(j, v) }.toTypedArray())
     }.toTypedArray()).parallel()
 
     companion object {
@@ -29,13 +33,22 @@ class Matrixf(val values: Array<FloatArray>) {
 
         fun fromRows(vararg rows: FloatArray) = Matrixf(Array(rows.size, rows::get))
 
+        fun fromRows(vararg rows: IntArray) =
+            Matrixf(Array(rows.size) { i -> rows[i].map { it.toFloat() }.toFloatArray() })
+
         fun fromRowArray(rows: Array<FloatArray>) = Matrixf(rows)
+
+        fun fromRowArray(rows: Array<IntArray>) =
+            Matrixf(Array(rows.size) { i -> rows[i].map { it.toFloat() }.toFloatArray() })
 
         fun fromColumns(vararg columns: FloatArray) =
             Matrixf(Array(columns.first().size) { i -> FloatArray(columns.first().size) { j -> columns[j][i] } })
 
-        fun fromColumnArray(columns: Array<FloatArray>) =
-            Matrixf(Array(columns.first().size) { i -> FloatArray(columns.first().size) { j -> columns[j][i] } })
+        fun fromColumns(vararg columns: IntArray) =
+            Matrixf(Array(columns.first().size) { i -> FloatArray(columns.first().size) { j -> columns[j][i].toFloat() } })
+
+        fun fromColumnArray(columns: Array<IntArray>) =
+            Matrixf(Array(columns.first().size) { i -> FloatArray(columns.first().size) { j -> columns[j][i].toFloat() } })
 
         fun identity(n: Int, m: Int) = Matrixf((0 until n).map { i ->
             (0 until m).map { j -> if (i == j) 1.0f else 0.0f }.toFloatArray()
@@ -47,13 +60,13 @@ class Matrixf(val values: Array<FloatArray>) {
         infix operator fun Long.times(matrix: Matrixf) = matrix.map { v -> this * v }
     }
 
-    operator fun get(i: Int, j: Int) = values[i][j]
-    operator fun set(i: Int, j: Int, value: Float) = values[i].set(j, value)
+    operator fun get(i: Int, j: Int) = rows[i][j]
+    operator fun set(i: Int, j: Int, value: Float) = rows[i].set(j, value)
 
     operator fun get(i: Int) = row(i)
-    operator fun set(i: Int, row: FloatArray) = values.set(i, row)
+    operator fun set(i: Int, row: FloatArray) = rows.set(i, row)
 
-    fun row(r: Int) = values[r].clone()
+    fun row(r: Int) = rows[r].clone()
 
     fun column(c: Int) = FloatArray(m) { i -> this[i, c] }
 
@@ -61,8 +74,8 @@ class Matrixf(val values: Array<FloatArray>) {
         Matrixf(parallel().map { r -> r.map { v -> mapper(v) }.toFloatArray() }.toList().toTypedArray())
 
     fun mapIndexed(mapper: (Int, Int, Float) -> Float) =
-        Matrixf(parallelIndexed().map { r ->
-            r.map { t -> mapper(t.first, t.second, t.third) }.toFloatArray()
+        Matrixf(parallelIndexed().map { (i, r) ->
+            r.map { (j, v) -> mapper(i, j, v) }.toFloatArray()
         }.toList().toTypedArray())
 
     fun map2(other: Matrixf, mapper: (Float, Float) -> Float): Matrixf =
@@ -90,38 +103,105 @@ class Matrixf(val values: Array<FloatArray>) {
     infix operator fun times(vector: Vectorf) = this * fromColumns(vector.values)
 
     fun clone(): Matrixf =
-        Matrixf((0 until values.size).map { i -> values[i].clone() }.toTypedArray())
+        Matrixf((0 until rows.size).map { i -> rows[i].clone() }.toTypedArray())
 
-    //EchelonFormatter be praised!!
-    fun swapRows(r1: Int, r2: Int): Matrixf {
-        val min = Math.min(r1, r2)
-        val max = Math.min(r1, r2)
-        val start = values.slice(0 until min)
-        val middle = values.slice(min + 1 until max)
-        val end = values.slice(max + 1 until values.size)
-        val combined = listOf(start, listOf(row(max)), middle, listOf(row(min)), end).flatten()
-        return Matrixf(combined.toTypedArray())
+    //GaussJordan be praised!!
+    fun swapRows(r1: Int, r2: Int): Matrixf = clone().mapIndexed { i, j, v ->
+        return@mapIndexed when (i) {
+            r1 -> this[r2, j]
+            r2 -> this[r1, j]
+            else -> v
+        }
     }
 
-    fun scaleRow(row: Int, scalar: Float): Matrixf {
-        val clone = clone()
-        clone.values[row] = (clone.values[row].map { v -> v * scalar }.toFloatArray())
-        return clone
-    }
+    fun scaleRow(row: Int, scalar: Float): Matrixf =
+        clone().mapIndexed { i, _, v ->
+            when (i) {
+                row -> v * scalar
+                else -> v
+            }
+        }
 
-    fun scaleAddRows(r1s: Float, r1: Int, r2: Int): Matrixf {
-        val scaled = scaleRow(r1, r1s)
-        scaled[r2] = scaled[r2].mapIndexed { i, v -> scaled[r1, i] + v }.toFloatArray()
-        return scaled
-    }
+    fun scaleAddRows(r1s: Float, r1: Int, r2: Int): Matrixf =
+        clone().mapIndexed { i, j, v ->
+            when (i) {
+                r2 -> (r1s * this[r1, j]) + v
+                else -> v
+            }
+        }
 
     fun addRows(r1: Int, r2: Int): Matrixf = scaleAddRows(1f, r1, r2)
 
+    fun echelonForm(): GaussJordan.ReductionResult {
+        if (echelonForm == null) {
+            echelonForm = GaussJordan.reduceMatrixToEchelon(this)
+        }
+        return echelonForm!!
+    }
 
+    fun isEchelonForm(): Boolean {
+        val result = AtomicBoolean(true)
+        parallelIndexed().forEach { (i, r) ->
+            r.forEach { (j, v) ->
+                when {
+                    !result.get() -> return@forEach
+                    i == j && v!= 1f -> result.compareAndExchange(true, false)
+                    i > j && v != 0f -> result.compareAndExchange(true, false)
+                }
+            }
+        }
+        return result.get()
+    }
+
+    fun reducedEchelonForm(): GaussJordan.ReductionResult {
+        if (reducedEchelonForm == null) {
+            reducedEchelonForm = GaussJordan.reduceMatrixToReducedEchelonForm(this)
+        }
+        return reducedEchelonForm!!
+    }
+
+    fun isReducedEchelonForm(): Boolean {
+        val result = AtomicBoolean(true)
+        parallelIndexed().forEach { (i, r) ->
+            r.forEach { (j, v) ->
+                when {
+                    !result.get() -> return@forEach
+                    i != j && v != 0f -> result.compareAndExchange(true, false)
+                    i == j && v != 1f -> result.compareAndExchange(true, false)
+                }
+            }
+        }
+        return result.get()
+    }
+
+    fun determinant(): Float {
+        val ech = reducedEchelonForm()
+        if (ech.matrix.parallel().anyMatch { r -> r.all { it == 0f } }) {
+            return 0f
+        }
+        return 1f / ech.trace.foldRight(1f) { move, acc ->
+            when (move) {
+                is GaussJordan.Swap -> acc * -1
+                is GaussJordan.Scale -> acc * move.scalar
+                else -> acc
+            }
+        }
+    }
+
+    fun inverse(): Matrixf? {
+        if (determinant() == 0f) {
+            return null
+        }
+        val reduced = reducedEchelonForm()
+        return when (reduced.resultType) {
+            REDUCED_ROW_ECHELON -> reduced.trace.fold(identity(n, m)) { acc, move -> GaussJordan.applyMove(acc, move) }
+            else -> null
+        }
+    }
 
     override fun toString(): String {
         val stringBuilder = StringBuilder()
-        values.fold(stringBuilder) { acc, row ->
+        rows.fold(stringBuilder) { acc, row ->
             acc.append(
                 row.map { v -> String.format("%3.2f", v) }.joinToString(
                     separator = ", ",
@@ -132,5 +212,23 @@ class Matrixf(val values: Array<FloatArray>) {
             return@fold acc
         }
         return stringBuilder.toString().trimEnd()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Matrixf) return false
+
+        if (!rows.contentDeepEquals(other.rows)) return false
+        if (m != other.m) return false
+        if (n != other.n) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = rows.contentDeepHashCode()
+        result = 31 * result + m
+        result = 31 * result + n
+        return result
     }
 }
