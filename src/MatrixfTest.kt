@@ -122,13 +122,13 @@ internal class MatrixfTest {
     fun randomMatrixf(n: Int, m: Int): Matrixf {
         val random = ThreadLocalRandom.current()
         fun next() = random.nextGaussian().toFloat()
-        return Matrixf.init(n, m) { i, j -> next() }
+        return Matrixf.init(n, m) { _, _ -> next() }
     }
 
     fun randomReducibleMatrix(n: Int, m: Int): Matrixf {
         val random = ThreadLocalRandom.current()
         fun next() = random.nextGaussian().toFloat()
-        var current = Matrixf.init(n, m) { i, j -> next() }
+        var current = Matrixf.init(n, m) { _, _ -> next() }
         while (kotlin.runCatching { current.reducedEchelonForm() }.isFailure) {}
         return current.clone()
     }

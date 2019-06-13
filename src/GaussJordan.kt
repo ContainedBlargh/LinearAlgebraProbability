@@ -45,7 +45,7 @@ object GaussJordan {
             var tv = v
             if (v == 0f) {
                 ti = m.parallelIndexed()
-                    .filter { (i2, r2) -> r2[i].second != 0f }
+                    .filter { (_, r2) -> r2[i].second != 0f }
                     .findFirst().map { it.first }
                     .orElseThrow { IllegalStateException("Cannot reduce matrix with an all-zero column") }
                 tv = m[ti, i]
