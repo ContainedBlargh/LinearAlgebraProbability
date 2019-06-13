@@ -1,5 +1,4 @@
 import kotlin.math.acos
-import kotlin.math.sin
 import kotlin.math.sqrt
 
 class Vectorf(val values: FloatArray) {
