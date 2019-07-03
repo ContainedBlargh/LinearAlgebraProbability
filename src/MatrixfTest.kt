@@ -7,6 +7,9 @@ import kotlin.system.measureNanoTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import GaussJordan.Swap
+import GaussJordan.Scale
+import GaussJordan.Add
 
 internal class MatrixfTest {
 
@@ -129,7 +132,8 @@ internal class MatrixfTest {
         val random = ThreadLocalRandom.current()
         fun next() = random.nextGaussian().toFloat()
         var current = Matrixf.init(n, m) { _, _ -> next() }
-        while (kotlin.runCatching { current.reducedEchelonForm() }.isFailure) {}
+        while (kotlin.runCatching { current.reducedEchelonForm() }.isFailure) {
+        }
         return current.clone()
     }
 
@@ -185,5 +189,41 @@ internal class MatrixfTest {
                     "\nMulTimes:\nMax: ${mulTimes.max()!! / mio}ms\nMin: ${mulTimes.min()!! / mio}ms" +
                     "\nMedian: ${mulTimes[mulTimes.size / 2] / mio}ms\nAvg: ${mulTimes.average() / mio}ms"
         println(message)
+    }
+
+    @Test
+    fun adjoinTest() {
+        val mat = Matrixf.fromRows(
+            floatArrayOf(1f, 1f, 1f, 1f),
+            floatArrayOf(2f, 3f, 0f, -1f),
+            floatArrayOf(-3f, 4f, -1f, 1f),
+            floatArrayOf(1f, 2f, -1f, 1f)
+        )
+        val mat2 = Matrixf.fromRows(
+            floatArrayOf(1f, 1f, 1f, 1f),
+            floatArrayOf(2f, 3f, 0f, -1f),
+            floatArrayOf(-3f, 4f, -1f, 1f),
+            floatArrayOf(1f, 2f, -1f, 1f)
+        )
+        val newRows = mat.rows.zip(mat2.rows).map { it.first + it.second }.toTypedArray()
+        val expected = Matrixf.fromRowArray(newRows)
+        val adj = mat.adjoin(mat2)
+        println(adj)
+        assertEquals(expected, adj)
+    }
+
+    @Test
+    fun exc_1_1_55() {
+        val mat = Matrixf.fromRows(
+            floatArrayOf(1f, 1f, 1f, 1f),
+            floatArrayOf(2f, 3f, 0f, -1f),
+            floatArrayOf(-3f, 4f, -1f, 1f),
+            floatArrayOf(1f, 2f, -1f, 1f)
+        )
+        val reduced = mat.reducedEchelonForm()
+        val solVector = Vectorf.from(6f, 0f, 4f, 0f)
+        val backtraced = reduced.backtrace(solVector)
+        println(backtraced.second)
+        println(backtraced.first)
     }
 }

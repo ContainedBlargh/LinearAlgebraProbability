@@ -10,8 +10,8 @@ import kotlin.streams.toList
  * Good times.
  */
 class Matrixf(val rows: Array<FloatArray>) {
-    val m = rows.size
-    val n = rows.first().size
+    val m = rows.size //number of rows
+    val n = rows.first().size //number of columns
 
     private var echelonForm: GaussJordan.ReductionResult? = null
     private var reducedEchelonForm: GaussJordan.ReductionResult? = null
@@ -23,7 +23,7 @@ class Matrixf(val rows: Array<FloatArray>) {
 
     companion object {
         fun init(n: Int, m: Int, initializer: (Int, Int) -> Float) =
-            Matrixf(Array(m) { i -> FloatArray(n) { j -> initializer(i, j) } })
+            Matrixf(Array(m) { j -> FloatArray(n) { i -> initializer(i, j) } })
 
         fun from(n: Int, m: Int, vararg values: Float) =
             Matrixf(Array(m) { i -> values.slice(i * n until i * n + n).toFloatArray() })
@@ -209,6 +209,13 @@ class Matrixf(val rows: Array<FloatArray>) {
             REDUCED_ROW_ECHELON -> reduced.trace.fold(identity(n, m)) { acc, move -> GaussJordan.applyMove(acc, move) }
             else -> null
         }
+    }
+
+    fun adjoin(matrix: Matrixf): Matrixf = fromRowArray(rows.zip(matrix.rows).map { it.first + it.second }.toTypedArray())
+
+    fun adjoin(vector: Vectorf): Matrixf {
+        val vecMat = fromArray(1, vector.size, vector.values)
+        return adjoin(vecMat)
     }
 
     override fun toString(): String {

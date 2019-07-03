@@ -2,6 +2,7 @@ import kotlin.math.acos
 import kotlin.math.sqrt
 
 class Vectorf(val values: FloatArray) {
+    val size = values.size
     companion object {
         fun from(vararg floats: Float) = Vectorf(floats)
     }
@@ -39,4 +40,7 @@ class Vectorf(val values: FloatArray) {
         }.toFloatArray())
     }
 
+    override fun toString(): String {
+        return values.contentToString()
+    }
 }
