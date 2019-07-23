@@ -226,4 +226,17 @@ internal class MatrixfTest {
         println(backtraced.second)
         println(backtraced.first)
     }
+
+    @Test
+    fun exc_1_3_1() {
+        val mat = Matrixf.fromRows(
+            floatArrayOf(1f, 2f, 4f),
+            floatArrayOf(1f, 3f, 9f),
+            floatArrayOf(1f, 4f, 16f)
+        )
+        val reduced = mat.reducedEchelonForm()
+        val backtraced = reduced.backtrace(Vectorf.from(5f, 2f, 5f))
+        println(backtraced.second)
+        println(backtraced.first)
+    }
 }

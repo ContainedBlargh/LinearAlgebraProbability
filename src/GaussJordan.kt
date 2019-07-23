@@ -37,7 +37,7 @@ object GaussJordan {
         fun backtrace(coefficientVector: Vectorf): Pair<Vectorf, String> {
             val sb = StringBuilder()
             val adjoined = original.adjoin(coefficientVector)
-            sb.appendln(original)
+            sb.appendln(adjoined)
             val result = trace.fold(Triple(adjoined, sb, 0)) { (adj, sb, col), m ->
                 sb.appendln(m.toString())
                 val nMat = applyMove(adj, m)
