@@ -2,8 +2,8 @@ import GaussJordan.ReductionResultType.REDUCED_ROW_ECHELON
 import java.lang.StringBuilder
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.stream.Collectors
-import java.util.stream.IntStream
+import kotlin.math.floor
+import kotlin.math.sqrt
 import kotlin.streams.toList
 
 /**
@@ -22,6 +22,9 @@ class Matrixf(val rows: Array<FloatArray>) {
     }.toTypedArray()).parallel()
 
     companion object {
+
+        class MatrixfException(msg: String) : Exception(msg)
+
         fun init(n: Int, m: Int, initializer: (Int, Int) -> Float) =
             Matrixf(Array(m) { j -> FloatArray(n) { i -> initializer(i, j) } })
 
@@ -105,7 +108,7 @@ class Matrixf(val rows: Array<FloatArray>) {
             for (j in 0 until other.m) {
                 out[i, j] = 0f
                 r.forEach { (k, v) ->
-                   out[i, j] += v * other[k, j]
+                    out[i, j] += v * other[k, j]
                 }
             }
         }
@@ -187,6 +190,12 @@ class Matrixf(val rows: Array<FloatArray>) {
     }
 
     fun determinant(): Float {
+        if (n != m) {
+            throw MatrixfException("Determinants for non-square matrices not defined.")
+        }
+        if (n == 2) {
+            return (this[0, 0] * this[1, 1]) - (this[0, 1] * this[1, 0])
+        }
         val ech = reducedEchelonForm()
         if (ech.matrix.parallel().anyMatch { r -> r.all { it == 0f } }) {
             return 0f
@@ -211,11 +220,57 @@ class Matrixf(val rows: Array<FloatArray>) {
         }
     }
 
-    fun adjoin(matrix: Matrixf): Matrixf = fromRowArray(rows.zip(matrix.rows).map { it.first + it.second }.toTypedArray())
+    fun adjoin(matrix: Matrixf): Matrixf =
+        fromRowArray(rows.zip(matrix.rows).map { it.first + it.second }.toTypedArray())
 
     fun adjoin(vector: Vectorf): Matrixf {
         val vecMat = fromArray(1, vector.size, vector.values)
         return adjoin(vecMat)
+    }
+
+    fun eigenvalues(): FloatArray {
+        if (n != m) {
+            throw MatrixfException("Cannot deduce eigenvalues for non-square matrices.")
+        }
+        if (n != 2) {
+            throw MatrixfException("Can only deduce eigenvectors for 2 by 2 matrices.")
+        }
+        //2 x 2 matrix case:
+        // (λ - m00) * (λ - m11) - m01 * m10
+        // = λ^2 - λ*m11 - m00*λ + m00*m11 - m01 *m10
+        // a = 1
+        // b = -m11 - m00
+        // c = m00*m11 - m01*m10
+        //λ_1 = (-b + \sqrt(b^2-4*c))/2
+        //λ_2 = (-b - \sqrt(b^2-4*c))/2
+        //λ^2 - b*λ +
+        val b = -this[1, 1] - this[0, 0]
+        val c = this[0, 0] * this[1, 1] - this[0, 1] * this[1, 0]
+        val d = (b * b) - (4f * c)
+        val l1 = (-b + sqrt(d)) / 2
+        val l2 = (-b - sqrt(d)) / 2
+        return floatArrayOf(l1, l2)
+    }
+
+    fun eigenvectors(): List<Vectorf> {
+        if (n != m) {
+            throw MatrixfException("Cannot deduce eigenvalues for non-square matrices.")
+        }
+        if (n != 2) {
+            throw MatrixfException("Can only deduce eigenvectors for 2 by 2 matrices.")
+        }
+        fun deduceVector(l: Float): Vectorf {
+            val characteristicMatrix = (l * identity(n, m)) - this
+            val top = characteristicMatrix[0]
+            val canScale =
+                floor(top.first() % top.last()).toInt() == 0
+            return if (canScale) {
+                Vectorf.from(top.first() / top.last(), -1 * (top.last() / top.first()))
+            } else {
+                Vectorf.from(top.first(), -top.last())
+            }
+        }
+        return eigenvalues().map(::deduceVector)
     }
 
     override fun toString(): String {

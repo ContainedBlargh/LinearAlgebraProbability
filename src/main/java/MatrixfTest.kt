@@ -250,4 +250,24 @@ internal class MatrixfTest {
         val inverse = mat.inverse()
         println(inverse)
     }
+
+    @Test
+    fun eigenvaluesTest() {
+        val mat = Matrixf.from(2, 2, 2f, -2f, 1f, 5f)
+        val lambdas = mat.eigenvalues()
+        assertTrue("Computed eigenvalues are as expected") {
+            lambdas.contains(4f) && lambdas.contains(3f)
+        }
+    }
+
+    @Test
+    fun eigenvectorsTest() {
+        val mat = Matrixf.from(2, 2, 2f, -2f, 1f, 5f)
+        val vectors = mat.eigenvectors()
+        val expectedFirst = Vectorf.from(1, -1)
+        val expectedLast = Vectorf.from(1, -2)
+        assertTrue("Computed eigenvectors are as expected") {
+            vectors.contains(expectedFirst) && vectors.contains(expectedLast)
+        }
+    }
 }

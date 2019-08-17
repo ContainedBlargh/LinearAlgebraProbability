@@ -5,6 +5,7 @@ class Vectorf(val values: FloatArray) {
     val size = values.size
     companion object {
         fun from(vararg floats: Float) = Vectorf(floats)
+        fun from(vararg ints: Int) = Vectorf(ints.map(Int::toFloat).toFloatArray())
     }
 
     infix operator fun get(index: Int) = values[index]
@@ -42,5 +43,21 @@ class Vectorf(val values: FloatArray) {
 
     override fun toString(): String {
         return values.contentToString()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Vectorf) return false
+
+        if (!values.contentEquals(other.values)) return false
+        if (size != other.size) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = values.contentHashCode()
+        result = 31 * result + size
+        return result
     }
 }
