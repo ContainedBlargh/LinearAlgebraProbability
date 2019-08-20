@@ -7,9 +7,6 @@ import kotlin.system.measureNanoTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import GaussJordan.Swap
-import GaussJordan.Scale
-import GaussJordan.Add
 
 internal class MatrixfTest {
 
@@ -268,6 +265,23 @@ internal class MatrixfTest {
         val expectedLast = Vectorf.from(1, -2)
         assertTrue("Computed eigenvectors are as expected") {
             vectors.contains(expectedFirst) && vectors.contains(expectedLast)
+        }
+    }
+
+    @Test
+    fun eigenvectorTest2() {
+        val mat = Matrixf.from(2, 2, 2f, 1f, 1f, 2f)
+        val λ1 = 1f
+        val λ2 = 3f
+        val values = mat.eigenvalues()
+        assertTrue() {
+            values.contains(λ1) && values.contains(λ2)
+        }
+        val expectedFirst = Vectorf.from(1, -1)
+        val expectedSecond = Vectorf.from(1f, 1f)
+        val vectors = mat.eigenvectors()
+        assertTrue("Computed eigenvectors contain expected") {
+            vectors.contains(expectedFirst) && vectors.contains(expectedSecond)
         }
     }
 }

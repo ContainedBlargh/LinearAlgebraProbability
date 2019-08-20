@@ -3,6 +3,7 @@ import java.lang.StringBuilder
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.floor
+import kotlin.math.min
 import kotlin.math.sqrt
 import kotlin.streams.toList
 
@@ -154,6 +155,23 @@ class Matrixf(val rows: Array<FloatArray>) {
         return echelonForm!!
     }
 
+    fun isDiagonal(): Boolean {
+        val result = AtomicBoolean(true)
+        parallelIndexed().forEach { (i, r) ->
+            r.forEach { (j, v) ->
+                when {
+                    !result.get() -> return@forEach
+                    (i != j) && v != 0f -> result.compareAndExchange(true, false)
+                }
+            }
+        }
+        return result.get()
+    }
+
+    fun diagonal() = FloatArray(min(n, m)) {
+        this[it, it]
+    }
+
     fun isEchelonForm(): Boolean {
         val result = AtomicBoolean(true)
         parallelIndexed().forEach { (i, r) ->
@@ -232,6 +250,9 @@ class Matrixf(val rows: Array<FloatArray>) {
         if (n != m) {
             throw MatrixfException("Cannot deduce eigenvalues for non-square matrices.")
         }
+        if (isDiagonal()) {
+            return diagonal()
+        }
         if (n != 2) {
             throw MatrixfException("Can only deduce eigenvectors for 2 by 2 matrices.")
         }
@@ -253,21 +274,27 @@ class Matrixf(val rows: Array<FloatArray>) {
     }
 
     fun eigenvectors(): List<Vectorf> {
+        if (isDiagonal()) {
+            return rows.map { r -> Vectorf(r.map { if (it != 0f) it / it else 0f }.toFloatArray()) }
+        }
         if (n != m) {
             throw MatrixfException("Cannot deduce eigenvalues for non-square matrices.")
         }
-        if (n != 2) {
-            throw MatrixfException("Can only deduce eigenvectors for 2 by 2 matrices.")
+        if (n > 2) {
+            throw MatrixfException("Can only deduce eigenvectors for 2 by 2 matrices and *some* 3 by 3 matrices.")
         }
         fun deduceVector(l: Float): Vectorf {
             val characteristicMatrix = (l * identity(n, m)) - this
             val top = characteristicMatrix[0]
-            val canScale =
-                floor(top.first() % top.last()).toInt() == 0
-            return if (canScale) {
-                Vectorf.from(top.first() / top.last(), -1 * (top.last() / top.first()))
-            } else {
-                Vectorf.from(top.first(), -top.last())
+            val f = top.first()
+            val s = top.last()
+            val canScale = f > 1f && s > 1f && (s % f) == 0f && (f % s) == 0f
+            val canInvert = f < 0 && s < 0
+            return when {
+                canScale && canInvert -> Vectorf.from(f / s, -s / f) * -1
+                canScale -> Vectorf.from(f / s, -s / f)
+                canInvert -> Vectorf.from(f, -s) * -1
+                else -> Vectorf.from(f, -s)
             }
         }
         return eigenvalues().map(::deduceVector)

@@ -15,6 +15,7 @@ class Vectorf(val values: FloatArray) {
     infix operator fun minus(other: Vectorf) = Vectorf(values.mapIndexed { i, v -> v - other[i] }.toFloatArray())
 
     infix operator fun times(scalar: Float) = Vectorf(values.map { v -> v * scalar }.toFloatArray())
+    infix operator fun times(scalar: Int) = Vectorf(values.map { v -> v * scalar }.toFloatArray())
 
     infix operator fun times(matrix: Matrixf) = Matrixf.fromRows(values) * matrix
 
